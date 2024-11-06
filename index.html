@@ -1,1 +1,207 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Formulário de Terrenos</title>
+    <style>
+        /* Estilos permanecem os mesmos */
+    </style>
+</head>
+<body>
+    <div class="container">
+        <img src="https://raw.githubusercontent.com/fabiogrisard/addcasa/refs/heads/main/logoexatanovo.JPG" alt="Logotipo">
+        <div id="page1" class="page active">
+            <h1>Formulário de Terrenos</h1>
+            <form id="configForm">
+                <label for="folderId">ID da Pasta no Google Drive:</label>
+                <input type="text" id="folderId" name="folderId" required>
 
+                <label for="spreadsheetId">ID da Planilha no Google Sheets:</label>
+                <input type="text" id="spreadsheetId" name="spreadsheetId" required>
+
+                <label for="centralLocation">Localização Central da Cidade:</label>
+                <input type="text" id="centralLocation" name="centralLocation" required>
+
+                <button type="button" onclick="goToPage2()">Próxima Página</button>
+            </form>
+        </div>
+
+        <div id="page2" class="page">
+            <h1>Inserção de Dados do Terreno</h1>
+            <form id="dataForm">
+                <label for="numeroDado">Número do Terreno:</label>
+                <input type="text" id="numeroDado" name="numeroDado" required>
+
+                <label for="link">Link do Anúncio:</label>
+                <input type="url" id="link" name="link" required>
+
+                <label for="coordenadas">Coordenadas:</label>
+                <input type="text" id="coordenadas" name="coordenadas" required>
+
+                <label for="tipoRua">Tipo de Rua:</label>
+                <select id="tipoRua" name="tipoRua" required>
+                    <option value="3">Rua de Asfalto</option>
+                    <option value="1">Rua de Chão</option>
+                    <option value="2">Rua de Calçamento</option>
+                </select>
+
+                <label for="esquina">É esquina?</label>
+                <select id="esquina" name="esquina" required>
+                    <option value="1">Sim</option>
+                    <option value="0">Não</option>
+                </select>
+
+                <button type="submit">Enviar Dados</button>
+            </form>
+
+            <div id="map"></div>
+        </div>
+    </div>
+
+    <script>
+        function goToPage2() {
+            const folderId = document.getElementById('folderId').value;
+            const spreadsheetId = document.getElementById('spreadsheetId').value;
+            const centralLocation = document.getElementById('centralLocation').value;
+
+            if (folderId && spreadsheetId && centralLocation) {
+                localStorage.setItem('folderId', folderId);
+                localStorage.setItem('spreadsheetId', spreadsheetId);
+                localStorage.setItem('centralLocation', centralLocation);
+
+                document.getElementById('page1').classList.remove('active');
+                document.getElementById('page2').classList.add('active');
+                initMap();
+            } else {
+                alert('Por favor, preencha todos os campos.');
+            }
+        }
+
+        function calcularDistancia(lat1, lon1, lat2, lon2) {
+            const R = 6371; // Raio da Terra em km
+            const dLat = (lat2 - lat1) * Math.PI / 180;
+            const dLon = (lon2 - lon1) * Math.PI / 180;
+            const a = Math.sin(dLat/2) * Math.sin(dLat/2) +
+                Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) * 
+                Math.sin(dLon/2) * Math.sin(dLon/2);
+            const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+            const d = R * c; // Distância em km
+            return d;
+        }
+
+        document.getElementById('dataForm').addEventListener('submit', function(event) {
+            event.preventDefault();
+            const numeroDado = document.getElementById('numeroDado').value;
+            const link = document.getElementById('link').value;
+            const coordenadas = document.getElementById('coordenadas').value;
+            const tipoRua = document.getElementById('tipoRua').value;
+            const esquina = document.getElementById('esquina').value;
+
+            const folderId = localStorage.getItem('folderId');
+            const spreadsheetId = localStorage.getItem('spreadsheetId');
+            const centralLocation = localStorage.getItem('centralLocation');
+
+            // Calcular a distância
+            const [lat1, lon1] = centralLocation.split(',').map(Number);
+            const [lat2, lon2] = coordenadas.split(',').map(Number);
+            const distancia = calcularDistancia(lat1, lon1, lat2, lon2);
+
+            const dadosParaEnviar = {
+                folderId: folderId,
+                spreadsheetId: spreadsheetId,
+                numeroDado: numeroDado,
+                link: link,
+                coordenadas: coordenadas,
+                tipoRua: parseInt(tipoRua),
+                esquina: parseInt(esquina),
+                distancia: distancia.toFixed(2)
+            };
+
+            fetch('https://n8n.serranarealty.com.br/webhook/addterreno', {
+                method: 'POST',
+                mode: 'no-cors',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify(dadosParaEnviar)
+            })
+            .then(response => {
+                console.log('Resposta recebida');
+                alert('Dados enviados com sucesso!');
+            })
+            .catch((error) => {
+                console.error('Erro:', error);
+                alert('Erro ao enviar os dados. Por favor, tente novamente.');
+            });
+        });
+
+        function initMap() {
+            const map = new google.maps.Map(document.getElementById("map"), {
+                center: { lat: -25.394552444520578, lng: -51.4582512931166 },
+                zoom: 13,
+            });
+
+            const input = document.createElement("input");
+            input.id = "pac-input";
+            input.className = "controls";
+            input.type = "text";
+            input.placeholder = "Pesquisar endereço";
+
+            map.controls[google.maps.ControlPosition.TOP_LEFT].push(input);
+
+            const searchBox = new google.maps.places.SearchBox(input);
+
+            map.addListener("bounds_changed", () => {
+                searchBox.setBounds(map.getBounds());
+            });
+
+            let markers = [];
+
+            searchBox.addListener("places_changed", () => {
+                const places = searchBox.getPlaces();
+
+                if (places.length == 0) {
+                    return;
+                }
+
+                markers.forEach((marker) => {
+                    marker.setMap(null);
+                });
+                markers = [];
+
+                const bounds = new google.maps.LatLngBounds();
+                places.forEach((place) => {
+                    if (!place.geometry || !place.geometry.location) {
+                        console.log("Returned place contains no geometry");
+                        return;
+                    }
+
+                    const marker = new google.maps.Marker({
+                        map,
+                        title: place.name,
+                        position: place.geometry.location,
+                    });
+
+                    markers.push(marker);
+
+                    if (place.geometry.viewport) {
+                        bounds.union(place.geometry.viewport);
+                    } else {
+                        bounds.extend(place.geometry.location);
+                    }
+
+                    document.getElementById('coordenadas').value = place.geometry.location.lat() + ',' + place.geometry.location.lng();
+                });
+                map.fitBounds(bounds);
+            });
+
+            map.addListener("click", (mapsMouseEvent) => {
+                const coords = mapsMouseEvent.latLng.lat() + ',' + mapsMouseEvent.latLng.lng();
+                document.getElementById('coordenadas').value = coords;
+            });
+        }
+    </script>
+    <script src="https://maps.googleapis.com/maps/api/js?key=AIzaSyAryf15DN6a0iOH72GMB0IaS3qbL44E8G8&libraries=places&callback=initMap" async defer></script>
+</body>
+</html>
