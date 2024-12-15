@@ -34,7 +34,7 @@
             font-weight: bold;
             color: #555;
         }
-        input[type="text"], input[type="url"], input[type="number"], select {
+        input[type="text"], input[type="url"], select {
             padding: 10px;
             margin-top: 5px;
             border: 1px solid #ddd;
@@ -131,6 +131,13 @@
                     <option value="0">Não</option>
                 </select>
 
+                <label for="vocacao">Vocação do Terreno:</label>
+                <select id="vocacao" name="vocacao" required>
+                    <option value="1">Residencial</option>
+                    <option value="2">Comercial Pólo Secundário</option>
+                    <option value="3">Comercial Pólo Primário</option>
+                </select>
+
                 <button type="submit">Enviar Dados</button>
             </form>
 
@@ -176,6 +183,7 @@
             const coordenadas = document.getElementById('coordenadas').value;
             const tipoRua = document.getElementById('tipoRua').value;
             const esquina = document.getElementById('esquina').value;
+            const vocacao = document.getElementById('vocacao').value;
 
             const folderId = localStorage.getItem('folderId');
             const spreadsheetId = localStorage.getItem('spreadsheetId');
@@ -194,6 +202,7 @@
                 coordenadas: coordenadas,
                 tipoRua: parseInt(tipoRua),
                 esquina: parseInt(esquina),
+                vocacao: parseInt(vocacao),
                 distancia: distancia.toFixed(2)
             };
 
