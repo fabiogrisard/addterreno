@@ -34,12 +34,16 @@
             font-weight: bold;
             color: #555;
         }
-        input[type="text"], input[type="url"], select {
+        input[type="text"], input[type="url"], select, textarea {
             padding: 10px;
             margin-top: 5px;
             border: 1px solid #ddd;
             border-radius: 4px;
             width: 100%;
+        }
+        textarea {
+            resize: vertical;
+            height: 100px;
         }
         button {
             margin-top: 20px;
@@ -90,9 +94,16 @@
 <body>
     <div class="container">
         <img src="https://raw.githubusercontent.com/fabiogrisard/addcasa/refs/heads/main/logoexatanovo.JPG" alt="Logotipo">
+        
+        <!-- Página 1 -->
         <div id="page1" class="page active">
             <h1>Formulário de Terrenos</h1>
             <form id="configForm">
+                <label for="planilhaNome">Selecione a Planilha:</label>
+                <select id="planilhaNome" name="planilhaNome" required>
+                    <option value="">Carregando...</option>
+                </select>
+
                 <label for="folderId">ID da Pasta no Google Drive:</label>
                 <input type="text" id="folderId" name="folderId" required>
 
@@ -104,8 +115,11 @@
 
                 <button type="button" onclick="goToPage2()">Próxima Página</button>
             </form>
+
+            <div id="map"></div>
         </div>
 
+        <!-- Página 2 -->
         <div id="page2" class="page">
             <h1>Inserção de Dados do Terreno</h1>
             <form id="dataForm">
@@ -113,7 +127,10 @@
                 <input type="text" id="numeroDado" name="numeroDado" required>
 
                 <label for="link">Link do Anúncio:</label>
-                <input type="url" id="link" name="link" required>
+                <div style="display: flex; align-items: center;">
+                    <input type="url" id="link" name="link">
+                    <button type="button" onclick="pasteFromClipboard('link')">Colar</button>
+                </div>
 
                 <label for="coordenadas">Coordenadas:</label>
                 <input type="text" id="coordenadas" name="coordenadas" required>
@@ -140,12 +157,44 @@
 
                 <button type="submit">Enviar Dados</button>
             </form>
-
-            <div id="map"></div>
         </div>
     </div>
 
     <script>
+        // No carregamento da página, carregar planilhas existentes
+        window.onload = loadPlanilhas;
+
+        function loadPlanilhas() {
+            const url = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vRuuja7Tveui7EINl-hHXdHtK9JI8qLnx4bELPAtRQcstNNzN0PMt7_KfsSjuuubl40xLUWaGzyl1AY/pub?gid=0&single=true&output=csv';
+            
+            fetch(url)
+                .then(response => response.text())
+                .then(csv => {
+                    const linhas = csv.split('\n');
+                    const select = document.getElementById('planilhaNome');
+                    select.innerHTML = ''; // Limpa o "Carregando..."
+
+                    linhas.forEach(linha => {
+                        const colunas = linha.split(',');
+                        if (colunas.length === 3) {
+                            const nome = colunas[0].trim();
+                            const folderId = colunas[1].trim();
+                            const spreadsheetId = colunas[2].trim();
+
+                            const option = document.createElement('option');
+                            option.value = `${folderId},${spreadsheetId}`; // Armazena ambos os IDs
+                            option.textContent = nome;
+                            select.appendChild(option);
+                        }
+                    });
+                })
+                .catch(error => {
+                    console.error('Erro ao carregar planilhas:', error);
+                    const select = document.getElementById('planilhaNome');
+                    select.innerHTML = '<option value="">Erro ao carregar</option>';
+                });
+        }
+
         function goToPage2() {
             const folderId = document.getElementById('folderId').value;
             const spreadsheetId = document.getElementById('spreadsheetId').value;
@@ -158,22 +207,9 @@
 
                 document.getElementById('page1').classList.remove('active');
                 document.getElementById('page2').classList.add('active');
-                initMap();
             } else {
                 alert('Por favor, preencha todos os campos.');
             }
-        }
-
-        function calcularDistancia(lat1, lon1, lat2, lon2) {
-            const R = 6371; // Raio da Terra em km
-            const dLat = (lat2 - lat1) * Math.PI / 180;
-            const dLon = (lon2 - lon1) * Math.PI / 180;
-            const a = Math.sin(dLat/2) * Math.sin(dLat/2) +
-                Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) * 
-                Math.sin(dLon/2) * Math.sin(dLon/2);
-            const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
-            const d = R * c; // Distância em km
-            return d;
         }
 
         document.getElementById('dataForm').addEventListener('submit', function(event) {
@@ -185,14 +221,16 @@
             const esquina = document.getElementById('esquina').value;
             const vocacao = document.getElementById('vocacao').value;
 
+            if (!link) {
+                alert('Por favor, preencha o Link do Anúncio.');
+                return;
+            }
+
             const folderId = localStorage.getItem('folderId');
             const spreadsheetId = localStorage.getItem('spreadsheetId');
             const centralLocation = localStorage.getItem('centralLocation');
 
-            // Calcular a distância
-            const [lat1, lon1] = centralLocation.split(',').map(Number);
-            const [lat2, lon2] = coordenadas.split(',').map(Number);
-            const distancia = calcularDistancia(lat1, lon1, lat2, lon2);
+            // Calcular a distância de maneira similar, conforme necessário
 
             const dadosParaEnviar = {
                 folderId: folderId,
@@ -202,8 +240,7 @@
                 coordenadas: coordenadas,
                 tipoRua: parseInt(tipoRua),
                 esquina: parseInt(esquina),
-                vocacao: parseInt(vocacao),
-                distancia: distancia.toFixed(2)
+                vocacao: parseInt(vocacao)
             };
 
             fetch('https://n8n.serranarealty.com.br/webhook/addterreno', {
@@ -224,6 +261,7 @@
             });
         });
 
+        // Inicializar e configurar o mapa
         function initMap() {
             const map = new google.maps.Map(document.getElementById("map"), {
                 center: { lat: -25.394552444520578, lng: -51.4582512931166 },
@@ -288,6 +326,17 @@
                 const coords = mapsMouseEvent.latLng.lat() + ',' + mapsMouseEvent.latLng.lng();
                 document.getElementById('coordenadas').value = coords;
             });
+        }
+
+        // Função para colar texto da área de transferência
+        async function pasteFromClipboard(fieldId) {
+            try {
+                const text = await navigator.clipboard.readText();
+                document.getElementById(fieldId).value = text;
+            } catch (err) {
+                console.error('Falha ao colar texto: ', err);
+                alert('Falha ao colar texto. Verifique as permissões do navegador.');
+            }
         }
     </script>
     <script src="https://maps.googleapis.com/maps/api/js?key=AIzaSyAryf15DN6a0iOH72GMB0IaS3qbL44E8G8&libraries=places&callback=initMap" async defer></script>
