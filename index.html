@@ -262,7 +262,7 @@
                 vocacao: parseInt(vocacao)
             };
 
-            fetch('https://n8n.serranarealty.com.br/webhook-test/addterreno', {
+            fetch('https://n8n.serranarealty.com.br/webhook/addterreno', {
                 method: 'POST',
                 mode: 'no-cors',
                 headers: {
@@ -280,16 +280,70 @@
             });
         });
 
-        // Inicializar e configurar o mapa para Localização Central
+        // Inicializar e configurar o mapa para Localização Central com campo de pesquisa
         function initMapCentral() {
             const mapCentral = new google.maps.Map(document.getElementById("mapCentral"), {
                 center: { lat: -25.394552444520578, lng: -51.4582512931166 },
                 zoom: 13,
             });
 
+            const input = document.createElement("input");
+            input.id = "pac-input-central";
+            input.className = "controls";
+            input.type = "text";
+            input.placeholder = "Pesquisar endereço";
+
+            mapCentral.controls[google.maps.ControlPosition.TOP_LEFT].push(input);
+
+            const searchBox = new google.maps.places.SearchBox(input);
+
+            mapCentral.addListener("bounds_changed", () => {
+                searchBox.setBounds(mapCentral.getBounds());
+            });
+
+            let markers = [];
+
+            searchBox.addListener("places_changed", () => {
+                const places = searchBox.getPlaces();
+
+                if (places.length == 0) {
+                    return;
+                }
+
+                markers.forEach((marker) => {
+                    marker.setMap(null);
+                });
+                markers = [];
+
+                const bounds = new google.maps.LatLngBounds();
+                places.forEach((place) => {
+                    if (!place.geometry || !place.geometry.location) {
+                        console.log("Returned place contains no geometry");
+                        return;
+                    }
+
+                    const marker = new google.maps.Marker({
+                        map: mapCentral,
+                        title: place.name,
+                        position: place.geometry.location,
+                    });
+
+                    markers.push(marker);
+
+                    if (place.geometry.viewport) {
+                        bounds.union(place.geometry.viewport);
+                    } else {
+                        bounds.extend(place.geometry.location);
+                    }
+
+                    document.getElementById('centralLocation').value = place.geometry.location.lat() + ',' + place.geometry.location.lng();
+                });
+                mapCentral.fitBounds(bounds);
+            });
+
             mapCentral.addListener("click", (mapsMouseEvent) => {
                 const coords = mapsMouseEvent.latLng.lat() + ',' + mapsMouseEvent.latLng.lng();
-                document.getElementById('centralLocation').value = coords; // Preenche localização central
+                document.getElementById('centralLocation').value = coords;
             });
         }
 
@@ -301,7 +355,7 @@
             });
 
             const input = document.createElement("input");
-            input.id = "pac-input";
+            input.id = "pac-input-terreno";
             input.className = "controls";
             input.type = "text";
             input.placeholder = "Pesquisar endereço";
