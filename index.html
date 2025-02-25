@@ -69,7 +69,7 @@
         .active {
             display: block;
         }
-        #map {
+        #mapCentral, #mapTerreno {
             height: 400px;
             width: 100%;
             margin-top: 20px;
@@ -113,10 +113,10 @@
                 <label for="centralLocation">Localização Central da Cidade:</label>
                 <input type="text" id="centralLocation" name="centralLocation" required>
 
+                <div id="mapCentral"></div>
+
                 <button type="button" onclick="goToPage2()">Próxima Página</button>
             </form>
-
-            <div id="map"></div>
         </div>
 
         <!-- Página 2 -->
@@ -132,8 +132,16 @@
                     <button type="button" onclick="pasteFromClipboard('link')">Colar</button>
                 </div>
 
+                <label for="infoImovel">Informações do Imóvel:</label>
+                <div style="display: flex; align-items: center;">
+                    <textarea id="infoImovel" name="infoImovel"></textarea>
+                    <button type="button" onclick="pasteFromClipboard('infoImovel')">Colar</button>
+                </div>
+
                 <label for="coordenadas">Coordenadas:</label>
                 <input type="text" id="coordenadas" name="coordenadas" required>
+
+                <div id="mapTerreno"></div>
 
                 <label for="tipoRua">Tipo de Rua:</label>
                 <select id="tipoRua" name="tipoRua" required>
@@ -161,10 +169,11 @@
     </div>
 
     <script>
-        // No carregamento da página, carregar planilhas existentes
+        // No carregamento da página, carregar planilhas existentes e inicializar mapas
         window.onload = function() {
             loadPlanilhas();
-            initMap();
+            initMapCentral();
+            initMapTerreno();
         };
 
         function loadPlanilhas() {
@@ -226,13 +235,14 @@
             event.preventDefault();
             const numeroDado = document.getElementById('numeroDado').value;
             const link = document.getElementById('link').value;
+            const infoImovel = document.getElementById('infoImovel').value;
             const coordenadas = document.getElementById('coordenadas').value;
             const tipoRua = document.getElementById('tipoRua').value;
             const esquina = document.getElementById('esquina').value;
             const vocacao = document.getElementById('vocacao').value;
 
-            if (!link) {
-                alert('Por favor, preencha o Link do Anúncio.');
+            if (!link && !infoImovel) {
+                alert('Por favor, preencha o Link do Anúncio ou as Informações do Imóvel.');
                 return;
             }
 
@@ -245,6 +255,7 @@
                 spreadsheetId: spreadsheetId,
                 numeroDado: numeroDado,
                 link: link,
+                infoImovel: infoImovel,
                 coordenadas: coordenadas,
                 tipoRua: parseInt(tipoRua),
                 esquina: parseInt(esquina),
@@ -269,9 +280,22 @@
             });
         });
 
-        // Inicializar e configurar o mapa
-        function initMap() {
-            const map = new google.maps.Map(document.getElementById("map"), {
+        // Inicializar e configurar o mapa para Localização Central
+        function initMapCentral() {
+            const mapCentral = new google.maps.Map(document.getElementById("mapCentral"), {
+                center: { lat: -25.394552444520578, lng: -51.4582512931166 },
+                zoom: 13,
+            });
+
+            mapCentral.addListener("click", (mapsMouseEvent) => {
+                const coords = mapsMouseEvent.latLng.lat() + ',' + mapsMouseEvent.latLng.lng();
+                document.getElementById('centralLocation').value = coords; // Preenche localização central
+            });
+        }
+
+        // Inicializar e configurar o mapa para o Terreno
+        function initMapTerreno() {
+            const mapTerreno = new google.maps.Map(document.getElementById("mapTerreno"), {
                 center: { lat: -25.394552444520578, lng: -51.4582512931166 },
                 zoom: 13,
             });
@@ -282,12 +306,12 @@
             input.type = "text";
             input.placeholder = "Pesquisar endereço";
 
-            map.controls[google.maps.ControlPosition.TOP_LEFT].push(input);
+            mapTerreno.controls[google.maps.ControlPosition.TOP_LEFT].push(input);
 
             const searchBox = new google.maps.places.SearchBox(input);
 
-            map.addListener("bounds_changed", () => {
-                searchBox.setBounds(map.getBounds());
+            mapTerreno.addListener("bounds_changed", () => {
+                searchBox.setBounds(mapTerreno.getBounds());
             });
 
             let markers = [];
@@ -312,7 +336,7 @@
                     }
 
                     const marker = new google.maps.Marker({
-                        map,
+                        map: mapTerreno,
                         title: place.name,
                         position: place.geometry.location,
                     });
@@ -327,12 +351,12 @@
 
                     document.getElementById('coordenadas').value = place.geometry.location.lat() + ',' + place.geometry.location.lng();
                 });
-                map.fitBounds(bounds);
+                mapTerreno.fitBounds(bounds);
             });
 
-            map.addListener("click", (mapsMouseEvent) => {
+            mapTerreno.addListener("click", (mapsMouseEvent) => {
                 const coords = mapsMouseEvent.latLng.lat() + ',' + mapsMouseEvent.latLng.lng();
-                document.getElementById('centralLocation').value = coords; // Atualiza com as coordenadas clicadas
+                document.getElementById('coordenadas').value = coords;
             });
         }
 
@@ -347,6 +371,6 @@
             }
         }
     </script>
-    <script src="https://maps.googleapis.com/maps/api/js?key=AIzaSyAryf15DN6a0iOH72GMB0IaS3qbL44E8G8&libraries=places&callback=initMap" async defer></script>
+    <script src="https://maps.googleapis.com/maps/api/js?key=AIzaSyAryf15DN6a0iOH72GMB0IaS3qbL44E8G8&libraries=places&callback=initMapCentral" async defer></script>
 </body>
 </html>
