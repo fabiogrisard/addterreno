@@ -162,7 +162,10 @@
 
     <script>
         // No carregamento da página, carregar planilhas existentes
-        window.onload = loadPlanilhas;
+        window.onload = function() {
+            loadPlanilhas();
+            initMap();
+        };
 
         function loadPlanilhas() {
             const url = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vRuuja7Tveui7EINl-hHXdHtK9JI8qLnx4bELPAtRQcstNNzN0PMt7_KfsSjuuubl40xLUWaGzyl1AY/pub?gid=0&single=true&output=csv';
@@ -194,6 +197,13 @@
                     select.innerHTML = '<option value="">Erro ao carregar</option>';
                 });
         }
+
+        // Ao selecionar uma planilha, preencher IDs
+        document.getElementById('planilhaNome').addEventListener('change', function() {
+            const [folderId, spreadsheetId] = this.value.split(',');
+            document.getElementById('folderId').value = folderId || '';
+            document.getElementById('spreadsheetId').value = spreadsheetId || '';
+        });
 
         function goToPage2() {
             const folderId = document.getElementById('folderId').value;
@@ -229,8 +239,6 @@
             const folderId = localStorage.getItem('folderId');
             const spreadsheetId = localStorage.getItem('spreadsheetId');
             const centralLocation = localStorage.getItem('centralLocation');
-
-            // Calcular a distância de maneira similar, conforme necessário
 
             const dadosParaEnviar = {
                 folderId: folderId,
@@ -324,7 +332,7 @@
 
             map.addListener("click", (mapsMouseEvent) => {
                 const coords = mapsMouseEvent.latLng.lat() + ',' + mapsMouseEvent.latLng.lng();
-                document.getElementById('coordenadas').value = coords;
+                document.getElementById('centralLocation').value = coords; // Atualiza com as coordenadas clicadas
             });
         }
 
