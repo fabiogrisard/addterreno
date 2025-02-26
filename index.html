@@ -142,6 +142,7 @@
                 <input type="text" id="coordenadas" name="coordenadas" required>
 
                 <div id="mapTerreno"></div>
+                <button type="button" onclick="getCurrentLocation()">Localizar Minha Posição</button>
 
                 <label for="tipoRua">Tipo de Rua:</label>
                 <select id="tipoRua" name="tipoRua" required>
@@ -240,6 +241,7 @@
             const tipoRua = document.getElementById('tipoRua').value;
             const esquina = document.getElementById('esquina').value;
             const vocacao = document.getElementById('vocacao').value;
+            const centralLocation = localStorage.getItem('centralLocation');
 
             if (!link && !infoImovel) {
                 alert('Por favor, preencha o Link do Anúncio ou as Informações do Imóvel.');
@@ -248,7 +250,9 @@
 
             const folderId = localStorage.getItem('folderId');
             const spreadsheetId = localStorage.getItem('spreadsheetId');
-            const centralLocation = localStorage.getItem('centralLocation');
+
+            // Calcular distância entre localizações
+            const distancia = calcularDistancia(centralLocation, coordenadas);
 
             const dadosParaEnviar = {
                 folderId: folderId,
@@ -259,10 +263,11 @@
                 coordenadas: coordenadas,
                 tipoRua: parseInt(tipoRua),
                 esquina: parseInt(esquina),
-                vocacao: parseInt(vocacao)
+                vocacao: parseInt(vocacao),
+                distancia: distancia.toFixed(2)
             };
 
-            fetch('https://n8n.serranarealty.com.br/webhook-test/addterreno', {
+            fetch('https://n8n.serranarealty.com.br/webhook/addterreno', {
                 method: 'POST',
                 mode: 'no-cors',
                 headers: {
@@ -279,6 +284,23 @@
                 alert('Erro ao enviar os dados. Por favor, tente novamente.');
             });
         });
+
+        // Calcular distância entre duas coordenadas
+        function calcularDistancia(centralLocation, coordenadas) {
+            const [lat1, lon1] = centralLocation.split(',').map(Number);
+            const [lat2, lon2] = coordenadas.split(',').map(Number);
+
+            const R = 6371; // Raio da Terra em km
+            const dLat = (lat2 - lat1) * Math.PI / 180;
+            const dLon = (lon2 - lon1) * Math.PI / 180;
+            const a = Math.sin(dLat/2) * Math.sin(dLat/2) +
+                      Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) * 
+                      Math.sin(dLon/2) * Math.sin(dLon/2);
+            const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+            const distancia = R * c; // Distância em km
+
+            return distancia;
+        }
 
         // Inicializar e configurar o mapa para Localização Central com campo de pesquisa
         function initMapCentral() {
@@ -412,6 +434,31 @@
                 const coords = mapsMouseEvent.latLng.lat() + ',' + mapsMouseEvent.latLng.lng();
                 document.getElementById('coordenadas').value = coords;
             });
+        }
+
+        // Função para obter a localização atual do usuário
+        function getCurrentLocation() {
+            if (navigator.geolocation) {
+                navigator.geolocation.getCurrentPosition(function(position) {
+                    const lat = position.coords.latitude;
+                    const lng = position.coords.longitude;
+                    const coords = lat + ',' + lng;
+
+                    const mapTerreno = new google.maps.Map(document.getElementById("mapTerreno"));
+                    mapTerreno.setCenter({ lat: lat, lng: lng });
+
+                    new google.maps.Marker({
+                        map: mapTerreno,
+                        position: { lat: lat, lng: lng }
+                    });
+
+                    document.getElementById('coordenadas').value = coords;
+                }, function(error) {
+                    alert('Erro ao obter a localização: ' + error.message);
+                });
+            } else {
+                alert('Geolocalização não suportada pelo navegador.');
+            }
         }
 
         // Função para colar texto da área de transferência
